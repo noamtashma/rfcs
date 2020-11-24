@@ -3,17 +3,6 @@
 - RFC PR: [rust-lang/rfcs#0000](https://github.com/rust-lang/rfcs/pull/0000)
 - Rust Issue: [rust-lang/rust#0000](https://github.com/rust-lang/rust/issues/0000)
 
-TODO: points to write in this documents:
-* this suggestion is simpler, since it unifies the traits
-* this suggestion paves the way for better integration for general self-argument-through-a-smart-pointer,
-such as `Fn(Pin<Self>, ..)`
-* this suggestion makes the closure less implicit. this is a trade-off between the more pure view that
-these objects are first functions that also have implicit data, to the more concrete view that it's
-data that has an associated function.
-* this suggestion will (hopefully) make this less confusing to beginners - they only need to understand
-moves and references first. note we do  not actually know if this is true, since we can't test it on any newcomers.
-
-
 # Summary
 [summary]: #summary
 
@@ -23,24 +12,24 @@ Replaces the current function trait family `Fn(A, ..) -> Res`, `FnMut(A, ..) -> 
 # Motivation
 [motivation]: #motivation
 
-Why are we doing this? What use cases does it support? What is the expected outcome?
-
-
-the importance of function traits for rust should not be understated. however, since it's introduction, the difference
+the importance of function traits for rust should not be understated. however, since its introduction, the difference
 between rust's `fn`, `Fn`, `FnMut` and `FnOnce` have been confusing to newcomers.
 <insert references to newcomer questions about these>.
 we believe that adopting this RFC will help newcomers that already understand borrowing rules, understand the different anonymous function types more easily, since it shows more clearly what is being borrowed and how.
+    
+in addition, we believe that even for experienced rust programmers, having a more natural syntax will be beneficial.
 
 say we have `object : T`. in rust, when you call `object.clone()`,  the type of `clone` isn't `fn() -> T`, it is `fn(&T) -> T`. that is, the first parameter of the function becomes the object itself, and it is explicitly written in the type of the function. this is important for a few reasons:
 first, it accurately reflects both the semantics of the program, and its actual concrete implementation.
 second, it allows the programmer to specify if the function should receive the object by value (`T`), by immutable reference (`&T`), or by a mutable reference (`&mut T`), or by any other smart pointer, and specifiy the needed lifetimes.
 
 function traits, however, are inconsistent with this convention, and currently, don't have these advantages. first, `FnMut(i8) -> i8` seems to suggest a mere function from `i8` to `i8`, even though in actual implementation and semantics this is more similar to a function `fn(&mut Closure, i8) -> i8`, where `Closure` is the anonymous structure that is the closure.
-second, we lose the second advantage as well, and instead, in order to tell in how the closure is used, we use the ad-hoc variants `Fn`, `FnMut`, `FnOnce`. this, however, makes the borrow checking errors less clear than it could have been.
+second, we lose the second advantage as well, and instead, in order to tell in how the closure is used, we use the ad-hoc variants `Fn`, `FnMut`, `FnOnce`. these three variants, that should really be the same in a few ways, are clunky and unintuitive.
 
 under this RFC, function traits will become more consistent with the rest of the Rust functions and the way they are typed. in addition, `Fn`, `FnMut` and `FnOne` will stop being ad-hoc special cases and will become more unified.
 
-the change we view here can be seen as a trade-off between two view points on anonymous functions. the first viewpoint wants to see anonymous functions as pure as possible: it's mainly just a function that you can call - therefore it should have a type that looks like `fn(i8) -> i8`. for example, `FnMut(i8) -> i8`. it has implementation details - that in mplementation i has to carry around a closure, and that it has three variants, each of which has its own peculiar usage rules (only call an `FnOnce` once, can't borrow an `FnMut` multiple times, etc).
+the change we view here can be seen as a trade-off between two view points on anonymous functions. the first viewpoint wants to see anonymous functions as pure as possible: it's mainly just a function that you can call - therefore it should have a type that looks like `fn(i8) -> i8`. for example, `FnMut(i8) -> i8`. it has implementation details - it has to carry around a closure, and so it has three variants, each of which has its own peculiar usage rules (only call an `FnOnce` once, can't borrow an `FnMut` multiple times, etc).
+
 the second viewpoint is more concrete:
 an anonymous function is actually an anonymous struct, called a closure, that implements a method as part of a function trait.
 
@@ -51,16 +40,6 @@ however, we believe the second view works better with real-life uses, and so giv
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
-
-Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:
-
-- Introducing new named concepts.
-- Explaining the feature largely in terms of examples.
-- Explaining how Rust programmers should *think* about the feature, and how it should impact the way they use Rust. It should explain the impact as concretely as possible.
-- If applicable, provide sample error messages, deprecation warnings, or migration guidance.
-- If applicable, describe the differences between teaching this to existing Rust programmers and new Rust programmers.
-
-For implementation-oriented RFCs (e.g. for compiler internals), this section should focus on how compiler contributors should think about the change, and give examples of its concrete impact. For policy RFCs, this section should provide an example-driven introduction to the policy, and explain its impact in concrete terms.
 
 this is basically a short retelling of the explanation of the difference between `Fn`, `FnMut` and `FnOnce`, since this already exists in the language.
 
@@ -124,10 +103,15 @@ to summarize: anonymous functions can access their closures in a few ways:
 * through a mutable reference: this will happen if your function mutates its capured variables
 * by value: this will result in a function that is only callable once. this can be useful in irder to transport values in some circumstances.
 
-we have a way of typing out this difference, using traits: these are called function traits. they are written like this, quite like regular function types:
+we have a way of typing out this difference, using traits: these are called function traits.
+each funcion trait requires a function like `call` to be implemented, with the requied type.
+they are written like this, quite like regular function types:
 `Fn(&Closure, inputs..) -> result`, or `Fn(&mut Closure, inputs..) -> result` or `Fn(Closure, intputs..) -> result`.
-these options tell you which way the Closure is accessed. which one to use depends on which of the three previous cases your function belongs to.
-specifically, `Closre` is a keyword, that can be thought of as being swapped with the actual anonymous closure struct at compile time.
+for example, the right function trait would be `Fn(&mut Closure, usize)` since the `call` function has type `fn (&mut AnonClosure, usize)`.
+these three options tell you which way the Closure is accessed. which one to use depends on which of the three previous cases your function belongs to.
+specifically, `Closure` is a keyword, that can be thought of as being swapped with the actual anonymous closure struct at compile time.
+
+TODO: <insert the example but using a function trait>
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -171,6 +155,8 @@ in addition, another drawback tat we require adding a new keyword to the languag
 - What other designs have been considered and what is the rationale for not choosing them?
 - What is the impact of not doing this?
 
+### alternatives
+
 originally, we wanted to use the keyword `Self` instead of `Closure`. this is because in Rust, whenever a method is called on an object, we use the name `Self` to refer to that object's type. this is true in `trait` declarations, trait `impl`ementations, and data `impl` blocks. therefore, using `Self` is more in line with the rest of the language, and uses an established keyword with a clear meaning.
 however, it has an ambiguity problem that  caused us to change it: whenever using a function trait inside a trait definition or an `impl` block, `Self` could then refer to both the type that is implementing the whole block, and to the anonymous function itself. in `impl` blocks that can be worked around, since in this case, you can refer to the type of the `impl` block in its more specific type, and reserve `Self` for the function trait (even though this is inelegant and confusing). however, in trait defnitions this problem is worse, since the only way to refer to the type that implements the trait, is using `Self`.
 
@@ -189,10 +175,6 @@ I do not know of any prior art: the problem that there are a few different seman
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
-
-- What parts of the design do you expect to resolve through the RFC process before this gets merged?
-- What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
-- What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
 
 ### what will be the exact timetable and steps of the transition from the old syntax to the new syntax?
 since this is only a syntactic change, it's probably best to rell out the changes slowly, using warnings, depracations, and an upgrade script. it is important to roll it out gently enough not to cause problems or break backwards comptibility too quickly.
@@ -235,24 +217,6 @@ can't be specified to be anything specific (since they couldn't be in the old sy
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
-
-Think about what the natural extension and evolution of your proposal would
-be and how it would affect the language and project as a whole in a holistic
-way. Try to use this section as a tool to more fully consider all possible
-interactions with the project and language in your proposal.
-Also consider how this all fits into the roadmap for the project
-and of the relevant sub-team.
-
-This is also a good place to "dump ideas", if they are out of scope for the
-RFC you are writing but otherwise related.
-
-If you have tried and cannot think of any future possibilities,
-you may simply state that you cannot think of anything.
-
-Note that having something written down in the future-possibilities section
-is not a reason to accept the current or a future RFC; such notes should be
-in the section on motivation or rationale in this or subsequent RFCs.
-The section merely provides additional information.
 
 ### extending this to other smart pointers
 for example, require for the generators feature, is a new function trait `FnPin` which, in our syntax, would look like `Fn(&mut Pin<Closure>, ...)`.
