@@ -19,16 +19,19 @@ we believe that adopting this RFC will help newcomers that already understand bo
     
 in addition, we believe that even for experienced rust programmers, having a more natural syntax will be beneficial.
 
-say we have `object : T`. in rust, when you call `object.clone()`,  the type of `clone` isn't `fn() -> T`, it is `fn(&T) -> T`. that is, the first parameter of the function becomes the object itself, and it is explicitly written in the type of the function. this is important for a few reasons:
-first, it accurately reflects both the semantics of the program, and its actual concrete implementation.
-second, it allows the programmer to specify if the function should receive the object by value (`T`), by immutable reference (`&T`), or by a mutable reference (`&mut T`), or by any other smart pointer, and specifiy the needed lifetimes.
+In Rust, there is the convention that the "self" of a method is reflected in its type, as its first argument. For example, say we have `object : T`. When you call `object.clone()`, the type of `clone` isn't `fn() -> T`, it is `fn(&T) -> T`. That is, the first parameter of the function is the object itself, and it is explicitly written inside the type of the function. This is important for a few reasons:
+First, it accurately reflects both the semantics of the program, and its actual concrete implementation.
+Second, it allows the programmer to specify if the function should receive the object by value (`T`), by immutable reference (`&T`), or by mutable reference (`&mut T`), or by any other smart pointer, and specify the needed lifetimes.
 
-function traits, however, are inconsistent with this convention, and currently, don't have these advantages. first, `FnMut(i8) -> i8` seems to suggest a mere function from `i8` to `i8`, even though in actual implementation and semantics this is more similar to a function `fn(&mut Closure, i8) -> i8`, where `Closure` is the anonymous structure that is the closure.
-second, we lose the second advantage as well, and instead, in order to tell in how the closure is used, we use the ad-hoc variants `Fn`, `FnMut`, `FnOnce`. these three variants, that should really be the same in a few ways, are clunky and unintuitive.
+Function traits, however, do not adopt this convention, and therefore, don't have these advantages. What do I mean by that?
+First, `FnMut(i8) -> i8` seems to suggest a mere function from `i8` to `i8`. However, in actual implementation, and in its semantics, this function receives its closure in addition to its other arguments. This makes the closure act like the "self" argument in method calls. For example, contrast `func.call()` with `func()`.
+Therefore, `FnMut(i8) -> i8` is actually more similar to a function `fn(&mut Closure, i8) -> i8`, where `Closure` is the anonymous structure that is the closure.
+In addition, we lose the second advantage: We can't specify in which way we are accessing the closure. Instead, in order to specify that, we use the ad-hoc variants `Fn`, `FnMut` and `FnOnce`.
 
-under this RFC, function traits will become more consistent with the rest of the Rust functions and the way they are typed. in addition, `Fn`, `FnMut` and `FnOne` will stop being ad-hoc special cases and will become more unified.
+Therefore, we suggest to change the syntax of function traits to reflect the fact that one of the inputs is the closure, much like the existing "self" inputs. For example, the current `Fn(i8)->i8` would be changed to `Fn(&Closure, i8) -> i8`, reflecting that the first input is actually the anonymous closure, taken by immutable reference. It should be noted that here `Closure` is a keyword, akin to `Self`. Similarly, `FnMut()` would become `Fn(&mut Closure)` and `FnOnce` would become `Fn(Closure)`. Overall, with this proposal, the function traits become more unified with each other, are more in line with regular function calls, and reflect the actual implementation and semantics more closely.
+TODO: claim that borrow checking behaviour becomes clearer.
 
-the change we view here can be seen as a trade-off between two view points on anonymous functions. the first viewpoint wants to see anonymous functions as pure as possible: it's mainly just a function that you can call - therefore it should have a type that looks like `fn(i8) -> i8`. for example, `FnMut(i8) -> i8`. it has implementation details - it has to carry around a closure, and so it has three variants, each of which has its own peculiar usage rules (only call an `FnOnce` once, can't borrow an `FnMut` multiple times, etc).
+the change we view here can be seen as a trade-off between two view points on anonymous functions. the first viewpoint wants to see anonymous functions as pure as possible: it's mainly just a function that you can call - therefore it should have a type that looks like `fn(i8) -> i8`. for example, `FnMut(i8) -> i8`. it has implementation details - it has to carry around a closure, and its type has three variants, each of which has its own peculiar usage rules (only call an `FnOnce` once, can't borrow an `FnMut` multiple times, etc).
 
 the second viewpoint is more concrete:
 an anonymous function is actually an anonymous struct, called a closure, that implements a method as part of a function trait.
@@ -101,7 +104,7 @@ an immutable reference, and we can't take it by value, because then we would con
 to summarize: anonymous functions can access their closures in a few ways:
 * through an immutable reference: this will happen if your function doesn't mutate its captured variables
 * through a mutable reference: this will happen if your function mutates its capured variables
-* by value: this will result in a function that is only callable once. this can be useful in irder to transport values in some circumstances.
+* by value: this will result in a function that is only callable once. this can be useful in order to transport values in some circumstances.
 
 we have a way of typing out this difference, using traits: these are called function traits.
 each funcion trait requires a function like `call` to be implemented, with the requied type.
