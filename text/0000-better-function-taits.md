@@ -6,8 +6,14 @@
 # Summary
 [summary]: #summary
 
-Replaces the current function trait family `Fn(A, ..) -> Res`, `FnMut(A, ..) -> Res`, `FnOnce(A, ..) -> Res` by the forms
-`Fn(&Closure, A, ..) -> Res`, `Fn(&mut Closure, A, ..) -> Res` and `Fn(Closure, A, ..) -> Res`.
+Replaces these forms:
+`Fn(A, ..) -> Res`
+`FnMut(A, ..) -> Res`
+`FnOnce(A, ..) -> Res`
+by the forms:
+`Fn(&Closure, A, ..) -> Res`
+`Fn(&mut Closure, A, ..) -> Res`
+`Fn(Closure, A, ..) -> Res`.
 
 # Motivation
 [motivation]: #motivation
@@ -24,12 +30,13 @@ First, it accurately reflects both the semantics of the program, and its actual 
 Second, it allows the programmer to specify if the function should receive the object by value (`T`), by immutable reference (`&T`), or by mutable reference (`&mut T`), or by any other smart pointer, and specify the needed lifetimes.
 
 Function traits, however, do not adopt this convention, and therefore, don't have these advantages. What do I mean by that?
-First, `FnMut(i8) -> i8` seems to suggest a mere function from `i8` to `i8`. However, in actual implementation, and in its semantics, this function receives its closure in addition to its other arguments. This makes the closure act like the "self" argument in method calls. For example, contrast `func.call()` with `func()`.
+First, `FnMut(i8) -> i8` seems to suggest a mere function from `i8` to `i8`. However, in implementation and semantics, it isn't. This function receives its closure in addition to its other arguments. This makes the closure act like the "self" argument in method calls. For example, contrast `func.call()` with `func()`.
 Therefore, `FnMut(i8) -> i8` is actually more similar to a function `fn(&mut Closure, i8) -> i8`, where `Closure` is the anonymous structure that is the closure.
 In addition, we lose the second advantage: We can't specify in which way we are accessing the closure. Instead, in order to specify that, we use the ad-hoc variants `Fn`, `FnMut` and `FnOnce`.
 
-Therefore, we suggest to change the syntax of function traits to reflect the fact that one of the inputs is the closure, much like the existing "self" inputs. For example, the current `Fn(i8)->i8` would be changed to `Fn(&Closure, i8) -> i8`, reflecting that the first input is actually the anonymous closure, taken by immutable reference. It should be noted that here `Closure` is a keyword, akin to `Self`. Similarly, `FnMut()` would become `Fn(&mut Closure)` and `FnOnce` would become `Fn(Closure)`. Overall, with this proposal, the function traits become more unified with each other, are more in line with regular function calls, and reflect the actual implementation and semantics more closely.
-TODO: claim that borrow checking behaviour becomes clearer.
+Therefore, we suggest to change the syntax of function traits to reflect the fact that one of the inputs is the closure, much like the existing "self" inputs. For example, the current `Fn(i8)->i8` would be changed to `Fn(&Closure, i8) -> i8`, reflecting that the first input is actually the anonymous closure, taken by immutable reference. It should be noted that here `Closure` is a keyword, akin to `Self`. Similarly, `FnMut()` would become `Fn(&mut Closure)` and `FnOnce()` would become `Fn(Closure)`. Overall, with this proposal, the function traits become more unified with each other, are more in line with regular function calls, and reflect the actual implementation and semantics more closely.
+
+In addition, I believe that function trait's borrow checking behavior is confusing. Even for novices that already understand the normal borrow checking rules, can be confused by the fact that an `FnMut` function has to be declared mutable for it to be called (TODO: give examples). I argue that showing the root cause of these borrow checking errors in the types, i.e. the implicit `Closure` input, will help clear things up for newcomers and help seasoned rustaceans as well.
 
 the change we view here can be seen as a trade-off between two view points on anonymous functions. the first viewpoint wants to see anonymous functions as pure as possible: it's mainly just a function that you can call - therefore it should have a type that looks like `fn(i8) -> i8`. for example, `FnMut(i8) -> i8`. it has implementation details - it has to carry around a closure, and its type has three variants, each of which has its own peculiar usage rules (only call an `FnOnce` once, can't borrow an `FnMut` multiple times, etc).
 
@@ -151,6 +158,10 @@ however, this can be done relatively easily: it is possible to convert between t
 
 in addition, another drawback tat we require adding a new keyword to the language, `Closure`. first of all, adding new keywords to the language should not be taken lightly, since the language should be kept as clean as possible. secondly, this would mean anyone that used the word `Closure` previously as the name for a datatype would have to rename it to something new. (or perhaps types of this name could be forbidden inside function traits, but allowed elsewhere: see unresolved questions).
 
+Introducing the `Closure` input introduces new positions for lifetime parameters (in the immutable and mutable reference cases). In general, I believe it is a good thing - see the `Future possibilities` section about more general lifetimes. However, the current RFC basically ignores that possibility - even writing any lifetime parameter there is an error. This is in order to minimize the change the RFC would bring. Changing that would necessitate a change to the type system, which this RFC does not require. 
+On one hand, a consequence of this is that the lifetime elision rules for function traits have to remain consistent with what they were before this RFC. On the other hand, another input with a lifetime slot was added (`&Closure`), that looks like it should act like `&Self`. These two point clash, and make the elision rules become less consistent and less intuitive.
+However, It remains to be seen if this will have much impact in practice. And in addition, this will be remedied eventually if the `Future possibilities` is taken as well (which I think it should).
+
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
@@ -198,25 +209,6 @@ one might suspect that after this change programmers will be moe inclined to typ
 ### should datatypes named `Closure` be outlawed completely, or should they be allowed, as long as the programmer doesn't use them in the types of anonymous functions?
 this is a rade-off between backwards compatibility and consistency - allowing that name might help someone that used the name `Closure` as a datatype maintain backwards compatibility. however, having a specific datatype name in the language that can't be use in the type of anonymous functions is unseemly and inelegant.
 
-### should more general lifetimes be possible inside the function types?
-for example, should the type `for<'a, 'b> Fn(&'a Closure, &'a i64, &'b i64) -> &'b i64` be possible?
-the current syntax doesn't allow for lifetime annoations on the Closure's reference. therefore, in order for this RFC to require a syntactical change only,
-we can't allow lifetime parameters to be specified on the closure's reference.
-
-the closest current type is `for <'b> Fn(&i64, &'b i64) -> &'b i64`, which in our new syntax is equivalent to `for<'a, 'b, 'c> Fn(&'c Closure, &'a i64, &'b i64) -> &'b i64`.
-
-currently, I am not sure what would be an example usecase for these more expressive function trait types, but having more expressive types always seems to uncover new possibilities that
-haven't been foreseen beforehand.
-
-advantages:
-- it will be more in line with the way functions are typed in rust, and more logically consistent
-
-disadvantages:
-- there doesn't seem to be any direct use for this kind of type. currently it isn't possible to create anonymous functions with such types, since when creating a anontmous function, the user can't reference the closure directly. this means that if this is allowed, such a type signature could only be used for things that are accepting other anonymous functions, and therefore could just use the more standard `Fn(&Closure, &i64, &'b i64) -> &'b i64` type.
-- it requires a change to the type checker, whereas otherwise, this RFC only requires a syntactical change to te language.
-
-currently, I am writing this RFC in a way such that only a syntactical change to the language is needed. in that case, the lifetme parameters in `&Closure` and `&mut Closure`
-can't be specified to be anything specific (since they couldn't be in the old syntax), and must always be elided. in that case, adding more specific lifetime parameters can be considered for the future possibilities section.
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
@@ -225,3 +217,40 @@ can't be specified to be anything specific (since they couldn't be in the old sy
 for example, require for the generators feature, is a new function trait `FnPin` which, in our syntax, would look like `Fn(&mut Pin<Closure>, ...)`.
 this then becomes a natural extention of the syntax, and removes the clunkiness of adding a new function trait into the language.
 in fact, one might allow all smart pointer types to be the first argument. what will be the uses of that, and what will be the syntax for creating that kind of anonymous function, will need to be determined.
+
+### more general lifetimes for function traits
+
+Introducing the `Closure` input introduces new positions for lifetime parameters (in the immutable and mutable reference cases). What should be done with them?
+The current RFC basically ignores that possibility - even writing any lifetime parameter there is an error. This is in order to minimize the change the RFC would bring. Changing that would necessitate a change to the type system, which we do not require now. However, using that lifetime parameter in types can be beneficial.
+
+For example, consider this code:
+```
+let mut state = T();
+let mut state_machine = move | input : i8 | {
+    state.update(input);
+    return &state;
+};
+```
+Where we attempt to create a state machine. Whenever we call `state_machine` it updates its state and then exposes it to the user. (we use `move` so that the state machine could live independently of its creator). we would like to expose the state by reference to avoid an expensive copy.
+In current Rust, this is a compilation error: "captured variable cannot escape `FnMut` closure body".
+However, imagine that our function had the type `Fn(&'a mut Closure, i8) -> &'a T`. That means that using the result forces the closure to be frozen for at least the same time. Therefore, our code is now safe and sound.
+
+This is one example of a use for this lifetime parameter slot.  However, this should apply to most cases of "captured variable cannot escape `FnMut` closure body". In addition, using this new lifetime might add uses I haven't thought of.
+
+In addition, implementing this change should be very easy, since it already fits the syntax, and the borrow checking rules for it match exactly the rules for regular functions already.
+
+Advantages:
+- it will be more in line with the way functions are typed in rust, and more logically consistent
+
+Disadvantages:
+- it requires a change to the type checker, whereas otherwise, this RFC only requires a syntactical change to te language.
+
+Currently, I am writing this RFC in a way such that only a syntactical change to the language is needed. However, if it is deemed easy and useful to implement this as well, this can be added to this RFC.
+
+# if the previous point is picked, should lifetime elision rules for function traits be changed?
+
+Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except<\i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. this is desireable because:
+    * this way is backwards compatible
+    * this way is more in line with viewing your function as "just a function"
+However, after adding the `Closure` argument, this becomes somewhat awkward, because it becomes inconsistent with the regular lifetime elision rules.
+Alternatively, one could update the lifetime elision rules not to ignore the `Closure` argument, or even treat it specially in some way.
