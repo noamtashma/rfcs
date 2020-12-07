@@ -7,12 +7,12 @@
 [summary]: #summary
 
 Replaces these forms:
-`Fn(A, ..) -> Res`
-`FnMut(A, ..) -> Res`
+`Fn(A, ..) -> Res`, 
+`FnMut(A, ..) -> Res`, and
 `FnOnce(A, ..) -> Res`
 by the forms:
-`Fn(&Closure, A, ..) -> Res`
-`Fn(&mut Closure, A, ..) -> Res`
+`Fn(&Closure, A, ..) -> Res`, 
+`Fn(&mut Closure, A, ..) -> Res`, and
 `Fn(Closure, A, ..) -> Res`.
 
 # Motivation
@@ -136,21 +136,23 @@ This is the technical portion of the RFC. Explain the design in sufficient detai
 
 The section should return to the examples given in the previous section, and explain more fully how the detailed proposal makes those examples work.
 
-after the RFC will be fully implemented, we will have these changes:
+After the RFC will be fully implemented, we will have these changes:
 
-we change the syntax of the `Fn` traits:
+We change the syntax of the `Fn` traits:
 `Fn(..) -> res` becomes `Fn(&Closure, ..) -> res`
-`FnMut(..) -> res` becomes `FnMut(&mut Closure, ..) -> res`
+`FnMut(..) -> res` becomes `Fn(&mut Closure, ..) -> res`
 `FnOnce(..) -> res` becomes `Fn(Closure, ..) -> res`
 
 and also the same change with the forms that have no return types.
 
-the two ways of writing the traits will be completely equivalent in every way.
-writing specific lifetime variables in the references is forbidden (at least in this version of the draft: see unresolved questions).
+The two ways of writing the traits will be completely equivalent in every way. At the beggining, the two forms will coexist for some time in order to be backwards compatible while easing the transition. (see proposed steps in unresolved questions section).
+Writing specific lifetime variables in the `Closure` references is forbidden (at least in this draft: see more general lifetimes in future possibilities).
 
-the two syntaxes can be (almost) unambiguously be distinguished from each other: if the compilers encounters `Fn`, if its first input type contains `Closure` in some way, then it mush be of the new syntax. otherwise, it must be of the current syntax.
+The two forms can be (almost) unambiguously be distinguished from each other: When the compilers encounters `Fn`, if its first input type contains `Closure` in some way, then it mush be of the new form. Otherwise, it must be of the current form.
 
-using types with the name of `Closure` will become a compilation error. (or, alternatively, using types with the name `Closure` inside function traits will become a compilation error: see unresolved questions).
+Using types with the name of `Closure` will become a compilation error, in order to resolve the ambiguity. (or, alternatively, only using types with the name `Closure` inside function traits will become a compilation error: see unresolved questions).
+
+This RFC can be implemented as a syntactical change only, if the compiler writers choose to do so.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -236,26 +238,28 @@ let mut state_machine = move | input : i8 | {
     return &state;
 };
 ```
-Where we attempt to create a state machine. Whenever we call `state_machine` it updates its state and then exposes it to the user. (we use `move` so that the state machine could live independently of its creator). we would like to expose the state by reference to avoid an expensive copy.
+Where we attempt to create a state machine. Whenever we call `state_machine` it updates its state and then exposes it to the user. (we use `move` so that the state machine could live independently of its creator). We would like to expose the state by reference to avoid an expensive copy.
 In current Rust, this is a compilation error: "captured variable cannot escape `FnMut` closure body".
-However, imagine that our function had the type `Fn(&'a mut Closure, i8) -> &'a T`. That means that using the result forces the closure to be frozen for at least the same time. Therefore, our code is now safe and sound.
+However, imagine that our function had the type `Fn(&'a mut Closure, i8) -> &'a T`. That is basically the same type we would have if we defined our own state-machine struct and had `call` as a method. Therefore, the code is now safe and sound.
+
+This works generally whenever an anonymous function wants to return a reference to one of its values. Then that reference could only be used until the next call to the function.
 
 This is one example of a use for this lifetime parameter slot.  However, this should apply to most cases of "captured variable cannot escape `FnMut` closure body". In addition, using this new lifetime might add uses I haven't thought of.
 
 In addition, implementing this change should be very easy, since it already fits the syntax, and the borrow checking rules for it match exactly the rules for regular functions already.
 
 Advantages:
-- it will be more in line with the way functions are typed in rust, and more logically consistent
+- It will be more in line with the way functions are typed in rust, and more logically consistent
 
 Disadvantages:
-- it requires a change to the type checker, whereas otherwise, this RFC only requires a syntactical change to te language.
+- It requires a change to the type checker, whereas otherwise, this RFC only requires a syntactical change to te language.
 
 Currently, I am writing this RFC in a way such that only a syntactical change to the language is needed. However, if it is deemed easy and useful to implement this as well, this can be added to this RFC.
 
-# If the previous point is picked, should lifetime elision rules for function traits be changed?
+# If the previous point is picked, should lifetime elision rules for anonymous functions be changed?
 
-Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except<\i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. this is desireable because:
-    * this way is backwards compatible
-    * this way is more in line with viewing your function as "just a function"
+Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except<\i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. This is desireable because:
+    * This way is backwards compatible
+    * This way is more in line with viewing your function as "just a function"
 However, after adding the `Closure` argument, this becomes somewhat awkward, because it becomes inconsistent with the regular lifetime elision rules.
-Alternatively, one could update the lifetime elision rules not to ignore the `Closure` argument, or even treat it specially in some way.
+Alternatively, one could update the lifetime elision rules not to ignore the `Closure` argument, or perhaps treat it specially in another way entirely.
