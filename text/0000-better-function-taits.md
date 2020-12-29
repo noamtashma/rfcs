@@ -157,14 +157,14 @@ This RFC can be implemented as a syntactical change only, if the compiler writer
 # Drawbacks
 [drawbacks]: #drawbacks
 
-of course, the most obvious drawback is that this is a change of Rust's syntax. this will require code to be edited to reflect the new syntax.
-however, this can be done relatively easily: it is possible to convert between the current and new syntax with a simple textual search, and the two syntaxes can be allowed to coexist for a transition period in order to ease the transition.
+Of course, the most obvious drawback is that this is a change of Rust's syntax. This will require code to be updated to reflect the new syntax.
+However, this can be done relatively easily: It is possible to convert between the current and new syntax with a simple textual search, and the two syntaxes can be allowed to coexist for a transition period in order to ease the transition.
 
-in addition, another drawback tat we require adding a new keyword to the language, `Closure`. first of all, adding new keywords to the language should not be taken lightly, since the language should be kept as clean as possible. secondly, this would mean anyone that used the word `Closure` previously as the name for a datatype would have to rename it to something new. (or perhaps types of this name could be forbidden inside function traits, but allowed elsewhere: see unresolved questions).
+In addition, another drawback tat we require adding a new keyword to the language, `Closure`. Adding new keywords to the language should not be taken lightly, since the language should be kept as clean as possible. In addition, this would mean anyone that used the word `Closure` previously as the name for a datatype would have to rename it to something new. (Or perhaps types of this name could be forbidden inside function traits, but allowed elsewhere: see unresolved questions).
 
 Introducing the `Closure` input introduces new positions for lifetime parameters (in the immutable and mutable reference cases). In general, I believe it is a good thing - see the `Future possibilities` section about more general lifetimes. However, the current RFC basically ignores that possibility - even writing any lifetime parameter there is an error. This is in order to minimize the change the RFC would bring. Changing that would necessitate a change to the type system, which this RFC does not require. 
 On one hand, a consequence of this is that the lifetime elision rules for function traits have to remain consistent with what they were before this RFC. On the other hand, another input with a lifetime slot was added (`&Closure`), that looks like it should act like `&Self`. These two point clash, and make the elision rules become less consistent and less intuitive.
-However, It remains to be seen if this will have much impact in practice. And in addition, this will be remedied eventually if the `Future possibilities` is taken as well (which I think it should).
+However, It remains to be seen if this will have much impact in practice. And in addition, this will be remedied eventually if the `Future possibilities` section is taken as well.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -177,6 +177,9 @@ However, It remains to be seen if this will have much impact in practice. And in
 I believe the rationale itself is explained clearly in the Motivation section.
 
 ### alternatives
+
+Of course, there is the alternative of doing nothing, and remaining with our current syntax. Other than that alternative, there are also:
+TODO
 
 originally, we wanted to use the keyword `Self` instead of `Closure`. this is because in Rust, whenever a method is called on an object, we use the name `Self` to refer to that object's type. this is true in trait declarations, trait implementations, and data `impl` blocks. therefore, using `Self` is more in line with the rest of the language, and uses an established keyword with a clear meaning.
 however, it has an ambiguity problem that  caused us to change it: whenever using a function trait inside a trait definition or an `impl` block, `Self` could then refer to both the type that is implementing the whole block, and to the anonymous function itself. in `impl` blocks that can be worked around, since in this case, you can refer to the type of the `impl` block in its more specific type, and reserve `Self` for the function trait (even though this is inelegant and confusing). however, in trait defnitions this problem is worse, since the only way to refer to the type that implements the trait, is using `Self`.
@@ -256,9 +259,9 @@ Disadvantages:
 
 Currently, I am writing this RFC in a way such that only a syntactical change to the language is needed. However, if it is deemed easy and useful to implement this as well, this can be added to this RFC.
 
-# If the previous point is picked, should lifetime elision rules for anonymous functions be changed?
+### If the previous point is picked, should lifetime elision rules for anonymous functions be changed?
 
-Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except<\i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. This is desireable because:
+Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except</i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. This is desireable because:
     * This way is backwards compatible
     * This way is more in line with viewing your function as "just a function"
 However, after adding the `Closure` argument, this becomes somewhat awkward, because it becomes inconsistent with the regular lifetime elision rules.
