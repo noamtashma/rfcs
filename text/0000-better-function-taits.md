@@ -262,7 +262,7 @@ Currently, I am writing this RFC in a way such that only a syntactical change to
 ### If the previous point is picked, should lifetime elision rules for anonymous functions be changed?
 
 Currently, the lifetime elision rules for function traits are the same for regular functions. That means that after adding the `Closure` argument, the lifetime rules are the same <i>except</i> that they ignore the `Closure` argument, giving it a distinct lifetime variable, and then apply the usual elision rules. This is desireable because:
-    * This way is backwards compatible
-    * This way is more in line with viewing your function as "just a function"
+- This way is backwards compatible
+- This way is more in line with viewing your function as "just a function"
 However, after adding the `Closure` argument, this becomes somewhat awkward, because it becomes inconsistent with the regular lifetime elision rules.
 Alternatively, one could update the lifetime elision rules not to ignore the `Closure` argument, or perhaps treat it specially in another way entirely.
