@@ -21,6 +21,7 @@ language is evolving in.
   - [Opening](#rust-rfcs)
   - [Table of Contents]
   - [When you need to follow this process]
+  - [Sub-team specific guidelines]
   - [Before creating an RFC]
   - [What the process is]
   - [The RFC life-cycle]
@@ -29,6 +30,7 @@ language is evolving in.
   - [RFC Postponement]
   - [Help this is all too informal!]
   - [License]
+  - [Contributions]
 
 
 ## When you need to follow this process
@@ -86,7 +88,7 @@ beforehand, to ascertain that the RFC may be desirable; having a consistent
 impact on the project requires concerted effort toward consensus-building.
 
 The most common preparations for writing and submitting an RFC include talking
-the idea over on our [official Discord server], discussing the topic on our
+the idea over on our [official Zulip server], discussing the topic on our
 [developer discussion forum], and occasionally posting "pre-RFCs" on the
 developer forum. You may file issues on this repo for discussion, but these are
 not actively looked at by the teams.
@@ -114,6 +116,8 @@ merged into the RFC repository as a markdown file. At that point the RFC is
   - Submit a pull request. As a pull request the RFC will receive design
     feedback from the larger community, and the author should be prepared to
     revise it in response.
+  - Now that your RFC has an open pull request, use the issue number of the PR
+    to update your `0000-` prefix to that number.
   - Each pull request will be labeled with the most relevant [sub-team], which
     will lead to its being triaged by that team in a future meeting and assigned
     to a member of the subteam.
@@ -249,21 +253,24 @@ circumstances. As usual, we are trying to let the process be driven by
 consensus and community norms, not impose more structure than necessary.
 
 
-[official Discord server]: https://discord.gg/rust-lang
-[developer discussion forum]: http://internals.rust-lang.org/
-[RFC repository]: http://github.com/rust-lang/rfcs
-[sub-team]: http://www.rust-lang.org/team.html
-
 ## License
 [License]: #license
 
 This repository is currently in the process of being licensed under either of:
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
 
 at your option. Some parts of the repository are already licensed according to those terms. For more see [RFC 2044](https://github.com/rust-lang/rfcs/pull/2044) and its [tracking issue](https://github.com/rust-lang/rust/issues/43461).
 
+
 ### Contributions
+[Contributions]: #contributions
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+
+[official Zulip server]: https://rust-lang.zulipchat.com/
+[developer discussion forum]: https://internals.rust-lang.org/
+[RFC repository]: https://github.com/rust-lang/rfcs
+[sub-team]: https://www.rust-lang.org/team.html
